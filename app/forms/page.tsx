@@ -16,7 +16,7 @@ export default function FormsDashboardPage() {
           />
           <h1 className="mt-6 text-3xl sm:text-4xl font-bold">Forms Dashboard</h1>
           <p className="mt-2 text-white/80 max-w-xl">
-            Manage student admissions and review all registrations for the May batch.
+            Manage student admissions and review all registrations for the current batch.
           </p>
         </div>
 

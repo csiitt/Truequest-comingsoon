@@ -22,6 +22,7 @@ import type {
   WebinarRecord,
   WebinarRegistrationRecord,
 } from "./types";
+import { BATCH_MONTH_OPTIONS, resolveBatchMonth } from "@/lib/batch-settings-shared";
 import {
   downloadWebinarRegistrationsExcel,
   formatCurrency,
@@ -323,6 +324,10 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
   const [nextBatchStartDate, setNextBatchStartDate] = useState("");
   const [nextBatchUpdatedAt, setNextBatchUpdatedAt] = useState("");
   const [nextBatchStartDateInput, setNextBatchStartDateInput] = useState("");
+  const [currentBatchMonth, setCurrentBatchMonth] = useState("May");
+  const [currentBatchNumber, setCurrentBatchNumber] = useState("01");
+  const [currentBatchMonthInput, setCurrentBatchMonthInput] = useState("May");
+  const [currentBatchNumberInput, setCurrentBatchNumberInput] = useState("01");
   const [smtpInfoMessage, setSmtpInfoMessage] = useState("");
   const [sendingNotificationEmail, setSendingNotificationEmail] = useState<string | null>(null);
   const [webinarTitleInput, setWebinarTitleInput] = useState("");
@@ -395,6 +400,11 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
       setNextBatchStartDate(data.nextBatchStartDate || "");
       setNextBatchUpdatedAt(data.nextBatchUpdatedAt || "");
       setNextBatchStartDateInput(data.nextBatchStartDate || "");
+      const resolvedBatchMonth = resolveBatchMonth(data.currentBatchMonth || "May");
+      setCurrentBatchMonth(resolvedBatchMonth);
+      setCurrentBatchNumber(data.currentBatchNumber || "01");
+      setCurrentBatchMonthInput(resolvedBatchMonth);
+      setCurrentBatchNumberInput(data.currentBatchNumber || "01");
       setAuthContext(data.auth || null);
       setIsAuthenticated(true);
     } finally {
@@ -677,6 +687,33 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
       await fetchRegistrations();
     } catch (error: unknown) {
       setErrorMessage(getErrorMessage(error, "Unable to save next batch date."));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleCurrentBatchSave() {
+    setErrorMessage("");
+    setSmtpInfoMessage("");
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/admin/registrations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "current_batch_update",
+          currentBatchMonth: currentBatchMonthInput,
+          currentBatchNumber: currentBatchNumberInput,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to save current batch settings.");
+      }
+      setSmtpInfoMessage("Current registration batch saved.");
+      await fetchRegistrations();
+    } catch (error: unknown) {
+      setErrorMessage(getErrorMessage(error, "Unable to save current batch settings."));
     } finally {
       setIsSaving(false);
     }
@@ -1631,6 +1668,9 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
                       </p>
                     )}
                     <p className="mt-1 text-sm text-slate-600">
+                      Current registration batch: {currentBatchMonth} (ID {currentBatchNumber})
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
                       Current next batch start date: {nextBatchStartDate ? formatDate(nextBatchStartDate) : "Not set"}
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
@@ -1694,6 +1734,50 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
                           >
                             Reset to .env
                           </button>
+                        </div>
+
+                        <div className="mt-5 border-t border-slate-200 pt-4">
+                          <h4 className="text-sm font-semibold text-slate-800">Current Registration Batch</h4>
+                          <p className="mt-1 text-sm text-slate-600">
+                            Controls the batch label on the public registration form and the batch ID suffix
+                            for new registrations (for example TQLDM{currentBatchNumber}).
+                          </p>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <label className="flex flex-col gap-1">
+                              <span className="text-xs font-medium text-slate-700">Batch month</span>
+                              <select
+                                value={currentBatchMonthInput}
+                                onChange={(event) => setCurrentBatchMonthInput(event.target.value)}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none focus:ring-2 focus:ring-[#2b24ff]/40"
+                              >
+                                {BATCH_MONTH_OPTIONS.map((month) => (
+                                  <option key={month} value={month}>
+                                    {month}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="text-xs font-medium text-slate-700">Batch ID number</span>
+                              <input
+                                value={currentBatchNumberInput}
+                                onChange={(event) => setCurrentBatchNumberInput(event.target.value)}
+                                placeholder="01"
+                                inputMode="numeric"
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none focus:ring-2 focus:ring-[#2b24ff]/40"
+                              />
+                            </label>
+                          </div>
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              onClick={handleCurrentBatchSave}
+                              disabled={isSaving}
+                              className="rounded-xl bg-[#2b24ff] px-4 py-2 text-sm font-semibold text-white hover:bg-[#221bff] disabled:opacity-70"
+                            >
+                              Save Current Batch
+                            </button>
+                          </div>
                         </div>
 
                         <div className="mt-5 border-t border-slate-200 pt-4">

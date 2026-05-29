@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type FormState = {
   name: string;
@@ -49,9 +49,36 @@ export default function StudentRegistrationPage() {
   const [phoneInfoMessage, setPhoneInfoMessage] = useState("");
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
   const [lastVerifiedPhone, setLastVerifiedPhone] = useState("");
+  const [batchRegistrationLabel, setBatchRegistrationLabel] = useState("May Batch Registration");
   const adminContactHref = `https://wa.me/919747003913?text=${encodeURIComponent(
     "Hi admin, I already registered on TrueQuest and need help with my registration details.",
   )}`;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadBatchSettings() {
+      try {
+        const response = await fetch("/api/forms/batch-settings");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !isMounted) {
+          return;
+        }
+
+        if (typeof data.batchLabel === "string" && data.batchLabel.trim()) {
+          setBatchRegistrationLabel(data.batchLabel);
+        }
+      } catch {
+        // Keep default label when settings cannot be loaded.
+      }
+    }
+
+    void loadBatchSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function verifyPhone(phoneInput: string) {
     const phone = phoneInput.replace(/\D/g, "").trim();
@@ -160,7 +187,7 @@ export default function StudentRegistrationPage() {
             priority
           />
           <h1 className="mt-6 text-3xl sm:text-4xl font-bold">Student Admission Form</h1>
-          <p className="mt-2 text-white/80">May Batch Registration</p>
+          <p className="mt-2 text-white/80">{batchRegistrationLabel}</p>
         </div>
 
         <form

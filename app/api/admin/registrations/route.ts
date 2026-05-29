@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildBatchId, getCurrentBatchSettings, saveCurrentBatchSettings } from "@/lib/batch-settings";
 import { sql } from "@/lib/db";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypto";
 import nodemailer from "nodemailer";
@@ -357,14 +358,6 @@ function getTotalFee(attendanceMode: AttendanceMode): number {
   return attendanceMode === "offline" ? 30000 : 25000;
 }
 
-function getBatchId(course: CourseSelection, attendanceMode: AttendanceMode): string | null {
-  if (course === "DM" && attendanceMode === "offline") return "TQLDM01";
-  if (course === "HR" && attendanceMode === "offline") return "TQLHR01";
-  if (course === "DM" && attendanceMode === "online") return "TQLODM01";
-  if (course === "HR" && attendanceMode === "online") return "TQLOHR01";
-  return null;
-}
-
 async function getNextRegistrationSequence(): Promise<number> {
   const maxSequenceResult = (await sql`
     SELECT COALESCE(MAX((substring(reg_no FROM '([0-9]+)$'))::int), ${REGISTRATION_NUMBER_BASE - 1}) AS max_sequence
@@ -482,7 +475,6 @@ async function ensureTables() {
       ELSE NULL
     END
     WHERE batch_id IS NULL
-       OR batch_id NOT IN ('TQLDM01', 'TQLHR01', 'TQLODM01', 'TQLOHR01')
   `;
 
   await sql`
@@ -606,7 +598,9 @@ function permissionForAction(action: string, method: "POST" | "PATCH" | "DELETE"
     if (action.startsWith("allowlist_")) return "allowed_students:manage";
     if (action.startsWith("webinar_")) return "webinar_management:manage";
     if (action.startsWith("registration_")) return "registrations:manage";
-    if (action.startsWith("smtp_") || action.startsWith("next_batch_")) return "overview:manage";
+    if (action.startsWith("smtp_") || action.startsWith("next_batch_") || action.startsWith("current_batch_")) {
+      return "overview:manage";
+    }
     if (action === "notification_send_email") return "brochure_requests:manage";
   }
   if (method === "DELETE") {
@@ -913,6 +907,7 @@ export async function GET(req: NextRequest) {
     `) as Array<{ next_batch_start_date: string | null; updated_at: string | null }>;
     const nextBatchStartDate = adminSettingsRows[0]?.next_batch_start_date || null;
     const nextBatchUpdatedAt = adminSettingsRows[0]?.updated_at || null;
+    const currentBatchSettings = await getCurrentBatchSettings();
 
     return NextResponse.json(
       {
@@ -926,6 +921,8 @@ export async function GET(req: NextRequest) {
         smtpSettings,
         nextBatchStartDate,
         nextBatchUpdatedAt,
+        currentBatchMonth: currentBatchSettings.batchMonth,
+        currentBatchNumber: currentBatchSettings.batchNumber,
         auth: {
           username: session.username,
           isSuperAdmin: session.isSuperAdmin,
@@ -1137,7 +1134,8 @@ export async function PATCH(req: NextRequest) {
       const dateOfBirth = normalizeString(body.dateOfBirth);
       const feePlan = parseFeePlan(body.feePlan);
       const totalFee = getTotalFee(attendanceMode);
-      const batchId = getBatchId(courseSelected, attendanceMode);
+      const batchSettings = await getCurrentBatchSettings();
+      const batchId = buildBatchId(courseSelected, attendanceMode, batchSettings.batchNumber);
 
       if (!id || !name || !emailId || !qualification || !attendanceMode || !place || !dateOfBirth) {
         return NextResponse.json({ error: "Please fill all required fields." }, { status: 400 });
@@ -1489,6 +1487,26 @@ export async function PATCH(req: NextRequest) {
     if (action === "smtp_reset") {
       await sql`DELETE FROM smtp_settings WHERE id = 1`;
       return NextResponse.json({ status: "ok" }, { status: 200 });
+    }
+
+    if (action === "current_batch_update") {
+      const currentBatchMonth = normalizeString(body.currentBatchMonth);
+      const currentBatchNumber = normalizeString(body.currentBatchNumber);
+
+      try {
+        const saved = await saveCurrentBatchSettings(currentBatchMonth, currentBatchNumber);
+        return NextResponse.json(
+          {
+            status: "ok",
+            currentBatchMonth: saved.batchMonth,
+            currentBatchNumber: saved.batchNumber,
+          },
+          { status: 200 },
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Invalid batch settings.";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
     }
 
     if (action === "next_batch_update") {

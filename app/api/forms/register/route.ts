@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildBatchId, ensureBatchSettingsSchema, getCurrentBatchSettings } from "@/lib/batch-settings";
 import { sql } from "@/lib/db";
 import nodemailer from "nodemailer";
 import { createDecipheriv, scryptSync } from "crypto";
@@ -52,14 +53,6 @@ function getRegistrationNumber(
 
 function getTotalFee(attendanceMode: AttendanceMode): number {
   return attendanceMode === "offline" ? 30000 : 25000;
-}
-
-function getBatchId(course: CourseSelection, attendanceMode: AttendanceMode): string | null {
-  if (course === "DM" && attendanceMode === "offline") return "TQLDM01";
-  if (course === "HR" && attendanceMode === "offline") return "TQLHR01";
-  if (course === "DM" && attendanceMode === "online") return "TQLODM01";
-  if (course === "HR" && attendanceMode === "online") return "TQLOHR01";
-  return null;
 }
 
 function isEncryptedSmtpPassword(value: string): boolean {
@@ -584,8 +577,9 @@ async function ensureTables() {
       ELSE NULL
     END
     WHERE batch_id IS NULL
-       OR batch_id NOT IN ('TQLDM01', 'TQLHR01', 'TQLODM01', 'TQLOHR01')
   `;
+
+  await ensureBatchSettingsSchema();
 
   await sql`
     ALTER TABLE student_registrations
@@ -732,7 +726,8 @@ export async function POST(req: NextRequest) {
     const lastInstitutionAttended = normalizeString(body.lastInstitutionAttended);
     const place = normalizeString(body.place);
     const dateOfBirth = normalizeString(body.dateOfBirth);
-    const batchId = getBatchId(courseSelected, attendanceMode);
+    const batchSettings = await getCurrentBatchSettings();
+    const batchId = buildBatchId(courseSelected, attendanceMode, batchSettings.batchNumber);
 
     if (
       !name ||
