@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, Fragment, useEffect, useState } from "react";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import { ActionIcon } from "./components/ActionIcon";
 import { AdminMobileSidebar } from "./components/AdminMobileSidebar";
 import { AdminSidebar } from "./components/AdminSidebar";
@@ -289,6 +290,7 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
   const [managedAdmins, setManagedAdmins] = useState<ManagedAdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
   const [newAdminPermissions, setNewAdminPermissions] = useState<AdminPermission[]>([]);
   const [newAdminPreset, setNewAdminPreset] = useState("");
   const [editingManagedAdminId, setEditingManagedAdminId] = useState<number | null>(null);
@@ -514,6 +516,7 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
       }
       setNewAdminUsername("");
       setNewAdminPassword("");
+      setShowNewAdminPassword(false);
       setNewAdminPermissions([]);
       setNewAdminPreset("");
       await fetchManagedAdmins();
@@ -1934,15 +1937,29 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
                       placeholder="Admin username"
                       className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none focus:ring-2 focus:ring-[#2b24ff]/40"
                     />
-                    <input
-                      required
-                      type="password"
-                      minLength={6}
-                      value={newAdminPassword}
-                      onChange={(event) => setNewAdminPassword(event.target.value)}
-                      placeholder="Password (min 6)"
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none focus:ring-2 focus:ring-[#2b24ff]/40"
-                    />
+                    <div className="relative">
+                      <input
+                        required
+                        type={showNewAdminPassword ? "text" : "password"}
+                        minLength={6}
+                        value={newAdminPassword}
+                        onChange={(event) => setNewAdminPassword(event.target.value)}
+                        placeholder="Password (min 6)"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-4 pr-14 text-slate-900 outline-none focus:ring-2 focus:ring-[#2b24ff]/40"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewAdminPassword((previous) => !previous)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label={showNewAdminPassword ? "Hide password" : "Show password"}
+                      >
+                        {showNewAdminPassword ? (
+                          <FiEyeOff className="h-5 w-5" aria-hidden />
+                        ) : (
+                          <FiEye className="h-5 w-5" aria-hidden />
+                        )}
+                      </button>
+                    </div>
                     <div className="md:col-span-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {ADMIN_PERMISSION_OPTIONS.map((permission) => (
                         <label key={permission} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
@@ -2342,27 +2359,15 @@ export default function FormsAdminPage({ forcedTab }: { forcedTab?: AdminTab } =
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold">Fee Management</h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Track total fee, paid amount, pending balance, mode-based fee setup, and payment dates.
+                      Track paid amount, mode-based fee setup, and payment dates.
                     </p>
                   </div>
 
-                  <div className="mb-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
-                      <p className="text-xs uppercase tracking-wide text-indigo-700">Total Fee</p>
-                      <p className="mt-1 text-2xl font-semibold text-indigo-700">
-                        {formatCurrency(totalFeeAmount)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                  <div className="mb-4">
+                    <div className="inline-block rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
                       <p className="text-xs uppercase tracking-wide text-cyan-700">Total Paid</p>
                       <p className="mt-1 text-2xl font-semibold text-cyan-700">
                         {formatCurrency(totalPaidAmount)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-                      <p className="text-xs uppercase tracking-wide text-rose-700">Total Pending</p>
-                      <p className="mt-1 text-2xl font-semibold text-rose-700">
-                        {formatCurrency(totalPendingAmount)}
                       </p>
                     </div>
                   </div>
